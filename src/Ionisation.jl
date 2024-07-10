@@ -4,7 +4,7 @@ import GSL: hypergeom
 import HDF5
 import FileWatching.Pidfile: mkpidlock
 import Logging: @info
-import Luna.PhysData: c, ħ, electron, m_e, au_energy, au_time, au_Efield, wlfreq
+import Luna.PhysData: c, ħ, electron, m_e, m_u, au_energy, au_time, au_Efield, wlfreq
 import Luna.PhysData: ionisation_potential, quantum_numbers
 import Luna: Maths, Utils
 import Printf: @sprintf
@@ -379,6 +379,69 @@ function ionrate_PPT(material::Symbol, λ0, E; kwargs...)
     n, l, Z = quantum_numbers(material)
     ip = ionisation_potential(material)
     return ionrate_PPT(ip, λ0, Z, l, E; kwargs...)
+end
+
+
+
+
+
+
+"""
+    ionrate_fun_keldysh(ionpot::Float64, λ0, Z, l; sum_tol=1e-4, cycle_average=false)
+
+Create closure to calculate Keldysh ionisation rate.
+
+# References
+[1] COUAIRON, A., & MYSYROWICZ, A.  
+Femtosecond filamentation in transparent media.
+ Physics Reports, 441(2–4), 47–189. (2007).
+ page 85
+
+[2] Majus, D., Jukna, V., Tamošauskas, G., Valiulis, G., & Dubietis, A. 
+Three-dimensional mapping of multiple filament arrays. 
+Physical Review A, 81(4), 043811. (2010). 
+"""
+
+
+function ionrate_fun_keldysh(ionpot::Float64, λ0,Nsum=1e3)
+    Ip_au = ionpot / au_energy #bangap
+    ω0 = 2π*c/λ0
+    ω0_au = au_time*ω0 #central frequency
+    m=0.635*m_e #usual reduced electron-hole mass from [2]  page 3
+    #Check units
+
+
+    ionrate = let ω0_au=ω0_au, m=m, Ip_au=Ip_au, Nsum=Nsum
+        function ionrate(E) 
+            E_au = abs(E)/au_Efield
+
+            # From [1]
+            γ = ω0_au/electron/E_au*sqrt(m*Ip_au)
+
+            Γ=γ^2/(1+\gamma^2)
+            Ξ=1//(1+\gamma^2)
+            
+            KΓ=ellipk(Γ)
+            KΞ=ellipk(Ξ)
+            EΓ=ellipe(Γ)
+            EΞ=ellipe(Ξ)
+
+            α=π*(KΓ-EΓ)/EΞ
+            β=π^2/(4*KΞ*EΞ)
+
+            x=2/π*Ip_au/ħ/ω0_au*EΞ/sqrt(Γ)
+            ν=floor(x+1, digits=0)-x #Check if it makes sense with these units
+            
+            f(n)=exp(-n*α)*dawson(sqrt(β*(n+2.0*ν)))
+            Q=sqrt(π/2/KΞ)*sum(f,UnitRange(0, Nsum))
+
+            ret=2*ω0_au/9/π*(ω0_au*m/ħ/sqrt(Γ))^1.5*Q*exp(-α*floor(x+1, digits=0))
+            #same as ν
+
+            return ret
+        end
+    end
+    return ionrate
 end
 
 end
