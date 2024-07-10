@@ -403,7 +403,7 @@ Physical Review A, 81(4), 043811. (2010).
 """
 
 
-function ionrate_fun_keldysh(ionpot::Float64, λ0,Nsum=1e3)
+function ionrate_fun!_Keldysh(ionpot::Float64, λ0; Nsum=1e3)
     Ip_au = ionpot / au_energy #bangap
     ω0 = 2π*c/λ0
     ω0_au = au_time*ω0 #central frequency
@@ -411,8 +411,8 @@ function ionrate_fun_keldysh(ionpot::Float64, λ0,Nsum=1e3)
     #Check units
 
 
-    ionrate = let ω0_au=ω0_au, m=m, Ip_au=Ip_au, Nsum=Nsum
-        function ionrate(E) 
+    ionrate! = let ω0_au=ω0_au, m=m, Ip_au=Ip_au, Nsum=Nsum
+        function ir(E) 
             E_au = abs(E)/au_Efield
 
             # From [1]
@@ -438,10 +438,32 @@ function ionrate_fun_keldysh(ionpot::Float64, λ0,Nsum=1e3)
             ret=2*ω0_au/9/π*(ω0_au*m/ħ/sqrt(Γ))^1.5*Q*exp(-α*floor(x+1, digits=0))
             #same as ν
 
+            
             return ret
         end
+        function ionrate!(out, E)
+            out .= ir.(E)
+        end
     end
-    return ionrate
+    return ionrate!
 end
+
+
+function ionrate_fun!_Keldysh(material::Symbol, λ0; kwargs...)
+    return ionrate_fun!_Keldysh(ionisation_potential(material), λ0; kwargs...)
+end
+
+function ionrate_Keldysh(IP_or_material, λ0, E; kwargs...)
+    out = zero(E)
+    ionrate_fun!_Keldysh(IP_or_material, λ0; kwargs...)(out, E)
+    return out
+end
+
+function ionrate_Keldysh(IP_or_material, λ0, E::Number; kwargs...)
+    out = [zero(E)]
+    ionrate_fun!_Keldysh(IP_or_material, λ0; kwargs...)(out, [E])
+    return out[1]
+end
+
 
 end
