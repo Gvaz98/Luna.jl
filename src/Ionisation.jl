@@ -387,9 +387,12 @@ end
 
 
 """
-    ionrate_fun_keldysh(ionpot::Float64, λ0, Z, l; sum_tol=1e-4, cycle_average=false)
+    ionrate_fun_keldysh(ionpot::Float64, λ0; Nsum=1e3)
 
 Create closure to calculate Keldysh ionisation rate.
+# Keyword arguments
+- `Nsum::Number`: Number of terms in the summation for teh calculation of 
+the variable Q(γ,x) [1]
 
 # References
 [1] COUAIRON, A., & MYSYROWICZ, A.  
