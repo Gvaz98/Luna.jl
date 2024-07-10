@@ -554,7 +554,7 @@ function makeplasma!(out, grid, gas, plasma::Symbol, pol)
     elseif plasma == :PPT
         ionrate = Ionisation.ionrate_fun!_PPTcached(gas, grid.referenceλ)
     elseif plasma == :Keldysh
-        ionrate = Ionisation.ionrate_fun!_Keldysh(gas, grid.referenceλ)
+        ionrate = Ionisation.ionrate_fun!_keldysh(gas, grid.referenceλ)
     else
         throw(DomainError(plasma, "Unknown ionisation rate $plasma."))
     end
