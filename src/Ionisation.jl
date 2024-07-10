@@ -8,6 +8,9 @@ import Luna.PhysData: c, ħ, electron, m_e, au_energy, au_time, au_Efield, wlfre
 import Luna.PhysData: ionisation_potential, quantum_numbers
 import Luna: Maths, Utils
 import Printf: @sprintf
+import Elliptic: E as E_int
+import Elliptic: K as E_int
+import NumericalIntegration: integrate
 
 """
     ionrate_fun!_ADK(ionpot::Float64, threshold=true)
