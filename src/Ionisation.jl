@@ -427,9 +427,21 @@ function ionrate_fun!_Keldysh(ionpot::Float64, λ0; Nsum=1e3)
             Γ=γ^2/(1+γ^2)
             Ξ=1/(1+γ^2)
 
+<<<<<<< HEAD
             # if isnan(γ)
             #     return zero(E)
             # end
+=======
+<<<<<<< HEAD
+            # if isnan(γ)
+            #     return zero(E)
+            # end
+=======
+            if isnan(γ)
+                return zero(E)
+            end
+>>>>>>> b9fb68ee9c13e49b0daf5a809aadd7cfcdeea975
+>>>>>>> a4e47fdbc4a3dfbadac917169363fe177e58d223
             
             KΓ=ellipk(Γ)
             KΞ=ellipk(Ξ)
