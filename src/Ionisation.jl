@@ -422,7 +422,11 @@ function ionrate_fun!_Keldysh(ionpot::Float64, λ0; Nsum=1e3)
             γ = ω0_au/electron/E_au*sqrt(m*Ip_au)
 
             Γ=γ^2/(1+γ^2)
-            Ξ=1//(1+γ^2)
+            Ξ=1/(1+γ^2)
+
+            if isnan(γ)
+                return zero(E)
+            end
             
             KΓ=ellipk(Γ)
             KΞ=ellipk(Ξ)

@@ -29,6 +29,8 @@ end
 
 ionpot = PhysData.ionisation_potential(gas)
 ionrate = Ionisation.ionrate_fun!_Keldysh(gas, λ0)
+# ionrate = Ionisation.ionrate_fun!_PPTcached(gas, λ0)
+# ionrate = Ionisation.ionrate_fun!_ADK(gas)
 
 responses = (Nonlinear.Kerr_field(PhysData.γ3_gas(gas)),Nonlinear.PlasmaCumtrapz(grid.to, grid.to, ionrate, ionpot))
 
