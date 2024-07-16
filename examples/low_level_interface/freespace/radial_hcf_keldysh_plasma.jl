@@ -4,8 +4,26 @@ import FFTW
 import Hankel
 import NumericalIntegration: integrate, SimpsonEven
 
+# gas = :Ar
+# λ0 = 800e-9
+# L = 0.15
+# grid = Grid.RealGrid(L, λ0, (200e-9, 3000e-9), 0.6e-12)
+# E =grid.to
+# ionrate = Ionisation.ionrate_fun!_Keldysh(gas, λ0)
+# rate=E
+# ionrate(rate,E)
+# rate
+# import SpecialFunctions: gamma, dawson, ellipk, ellipe
+# ellipk(Inf)
+import Luna.PhysData:sellmeier_glass
+material=:Sapphire
+sell=sellmeier_glass(material)
+sell(1)
+
+##
+
 a = 15e-6
-gas = :Ar
+gas = :YAG
 pres = 5.0
 
 τ = 30e-15
@@ -29,7 +47,7 @@ end
 
 ionpot = PhysData.ionisation_potential(gas)
 ionrate = Ionisation.ionrate_fun!_Keldysh(gas, λ0)
-# ionrate = Ionisation.ionrate_fun!_PPTcached(gas, λ0)
+ionrate = Ionisation.ionrate_fun!_PPTcached(gas, λ0)
 # ionrate = Ionisation.ionrate_fun!_ADK(gas)
 
 responses = (Nonlinear.Kerr_field(PhysData.γ3_gas(gas)),Nonlinear.PlasmaCumtrapz(grid.to, grid.to, ionrate, ionpot))

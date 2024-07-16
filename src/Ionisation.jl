@@ -416,9 +416,13 @@ function ionrate_fun!_Keldysh(ionpot::Float64, λ0; Nsum=1e3)
 
     ionrate! = let ω0_au=ω0_au, m=m, Ip_au=Ip_au, Nsum=Nsum
         function ir(E) 
-            if isnan(E)
-                @info @sprintf("E is %f",E)
+                        
+            @info @sprintf("E is nan? %i",isnan(E))
+            
+            if E==0
+                return zero(E)
             end
+
             E_au = abs(E)/au_Efield
 
             # From [1]
@@ -426,6 +430,10 @@ function ionrate_fun!_Keldysh(ionpot::Float64, λ0; Nsum=1e3)
 
             Γ=γ^2/(1+γ^2)
             Ξ=1/(1+γ^2)
+
+            if isnan(Γ) | isnan(Ξ)
+                print(E)
+            end
             
             KΓ=ellipk(Γ)
             KΞ=ellipk(Ξ)

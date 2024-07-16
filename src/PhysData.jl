@@ -7,6 +7,7 @@ import CSV
 import DelimitedFiles: readdlm
 import Polynomials
 import Luna: Maths, Utils
+import Logging: @warn
 
 include("data/lookup_tables.jl")
 
@@ -63,7 +64,9 @@ const gas_str = Dict(
     :N2O => "NitrousOxide",
     :D2 => "Deuterium"
 )
-const glass = (:SiO2, :BK7, :KBr, :CaF2, :BaF2, :Si, :MgF2, :ADPo, :ADPe, :KDPo, :KDPe, :CaCO3)
+const glass = (:SiO2, :BK7, :KBr, :CaF2, :BaF2, :Si, :MgF2, :ADPo, :ADPe, :KDPo, :KDPe, :CaCO3, :Sapphire, :YAG, :KGW, :YVO4)
+const uniaxial = (:MgF2, :CaCo3, :Sapphire, :YVO4) #ADP and KDP are split into o and e
+const biaxial = (:KGW, :BIBO)
 const metal = (:Ag,:Al)
 
 """
@@ -238,6 +241,12 @@ Sellmeier for glasses. Returns function of wavelength in μm which in turn retur
 refractive index directly
 """
 function sellmeier_glass(material::Symbol)
+    if material in uniaxial
+        @warn "Assuming n ordinary for "*string(material)
+    end
+    if material in biaxial
+        @warn "Assuming ny for "*string(material)
+    end
     if material == :SiO2
         #  J. Opt. Soc. Am. 55, 1205-1208 (1965)
         # TODO: Deal with sqrt of negative values better (somehow...)
@@ -287,6 +296,7 @@ function sellmeier_glass(material::Symbol)
              + 1.54133408/(1-(1104/μm)^2)
              ))
     elseif material == :MgF2
+        #H. H. Li. Refractive index of alkaline earth halides and its wavelength and temperature derivatives. J. Phys. Chem. Ref. Data 9, 161-289 (1980)
         return μm -> @. sqrt(complex(1
             + 0.27620
             + 0.60967/(1-(0.08636/μm)^2)
@@ -294,6 +304,7 @@ function sellmeier_glass(material::Symbol)
             + 2.14973/(1-(25.0/μm)^2)
             ))
     elseif material == :CaCO3
+        #G. Ghosh. Dispersion-equation coefficients for the refractive index and birefringence of calcite and quartz crystals, Opt. Commun. 163, 95-102 (1999)
         return μm -> @. sqrt(complex(1
             + 0.73358749
             + 0.96464345/(1-1.94325203e-2/μm^2)
@@ -322,6 +333,34 @@ function sellmeier_glass(material::Symbol)
             2.132668
             + 3.2279924*μm^2/(μm^2-400)
             + 0.008637494/(μm^2-0.0122810)
+        ))
+    elseif material == :Sapphire
+        #I. H. Malitson and M. J. Dodge. Refractive Index and Birefringence of Synthetic Sapphire, J. Opt. Soc. Am. 62, 1405 (1972)
+        return μm -> @. sqrt(complex(
+            1
+            + 1.4313493*μm^2/(μm^2 - 0.0726631^2)
+            + 0.65054713*μm^2/(μm^2 - 0.1193242^2)
+            + 5.3414021*μm^2/(μm^2 -18.028251^2)
+        ))
+    elseif material == :YAG
+        #D. E. Zelmon, D. L. Small and R. Page. Refractive-index measurements of undoped yttrium aluminum garnet from 0.4 to 5.0 μm, Appl. Opt. 37, 4933-4935 (1998) 
+        return μm -> @. sqrt(complex(
+            1
+            + 2.28200*μm^2/(μm^2-0.01185)
+            + 3.27644*μm^2/(μm^2-282.734)
+        ))
+    elseif material == :KGW
+        #Pujol et al. (1999). Crystalline structure and optical spectroscopy of Er3+-doped KGd(WO4)2 single crystals. Applied Physics B, 68(2), 187–197.
+        return μm -> @. sqrt(complex(
+            1.5437
+            + 0.4541/(1-(188.91e-3/μm)^2)
+            - 2.1567e-15*μm^2
+        ))
+    elseif material == :YVO4
+        #M. Birnbaum, L. G. DeShazer. Low threshold CW Nd laser oscillator at 1060 nm study NASA Report, Contract Number NAS 5-22387 (1976)
+        return μm -> @. sqrt(complex(
+            1
+            +  2.7665*μm^2/(μm^2-0.026884)
         ))
     else
         throw(DomainError(material, "Unknown glass $material"))
@@ -645,10 +684,14 @@ function γ3_gas(material::Symbol; source=nothing)
     end
 end
 
-function χ3(material::Symbol, P=1.0, T=roomtemp; source=nothing)
+function χ3(material::Symbol, P=1.0, T=roomtemp; source=nothing, λ=nothing)
     if material in glass
-        n2 = n2_glass(material, λ=1030e-9)
-        n0 = real(ref_index(material, 1030e-9))
+        if isnothing(λ)
+            λ=1030e-9
+            @warn "Setting wavelength to 1030 nm for calculation of \\chi3 phenomena.\n Give the \\chi3 function the keyword argument \\lambda"
+        end
+        n2 = n2_glass(material, λ=λ)
+        n0 = real(ref_index(material, λ))
         return 4/3 * n2 * (ε_0*c*n0^2)
     end
     return γ3_gas(material, source=source) .* density.(material, P, T)
@@ -670,6 +713,18 @@ function n2_glass(material::Symbol; λ=nothing)
     elseif material == :CaCO3
         # Kabaciński et al., 10.1364/OE.27.011018
         return 3.22e-20
+    elseif material == :Sapphire
+        # Marčiulionytė et al. , 10.1364/OE.489474
+        return 2.75e-20
+    elseif material == :YAG
+        # Marčiulionytė et al. , 10.1364/OE.489474
+        return 6.2e-20
+    elseif material == :KGW
+        # Marčiulionytė et al. , 10.1364/OE.489474
+        return 11e-20
+    elseif material == :YVO4
+        # Marčiulionytė et al. , 10.1364/OE.489474
+        return 15e-20
     else
         error("Unkown glass $material")
     end
@@ -744,6 +799,18 @@ function ionisation_potential(material; unit=:SI)
         Ip = 0.5
     elseif material == :D2
         Ip = 0.5684 # from NIST Chemistry WebBook
+    elseif material == :Sapphire
+        #10.1364/OE.489474 in eV
+        Ip = 9.0/27.21138602
+    elseif material == :YAG
+        #10.1364/OE.489474 in eV
+        Ip = 6.5/27.21138602
+    elseif material == :KGW
+        #10.1364/OE.489474 in eV
+        Ip = 4.25/27.21138602
+    elseif material == :YVO4
+        #10.1364/OE.489474 in eV
+        Ip = 3.69/27.21138602
     else
         throw(DomainError(material, "Unknown material $material"))
     end
@@ -968,7 +1035,10 @@ function raman_parameters(material)
               # TODO μ = 
               # TODO τ2v = 
              )
-    elseif material == :SiO2 # [18]
+    elseif material in glass # [18]
+        if material != :SiO2
+            @warn "Assuming Ramman parameters of SiO2. It is the standard approximation."
+        end
         rp = (kind = :intermediate,
               K = 1.0,
               Ω = 1.0/12.2e-15,
