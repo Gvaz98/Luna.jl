@@ -66,7 +66,7 @@ const gas_str = Dict(
 )
 const glass = (:SiO2, :BK7, :KBr, :CaF2, :BaF2, :Si, :MgF2, :ADPo, :ADPe, :KDPo, :KDPe, :CaCO3, :Sapphire, :YAG, :KGW, :YVO4)
 const uniaxial = (:MgF2, :CaCo3, :Sapphire, :YVO4) #ADP and KDP are split into o and e
-const biaxial = (:KGW, :BIBO)
+const biaxial = (:KGW)
 const metal = (:Ag,:Al)
 
 """

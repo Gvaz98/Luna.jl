@@ -391,7 +391,8 @@ end
 
 Create closure to calculate Keldysh ionisation rate.
 # Keyword arguments
-- `Nsum::Number`: Number of terms in the summation for teh calculation of 
+- `rtol::Number`: Relative tolerance to stop the calculation of the sumation
+- `maxiter::Number`: Maximum number of iteration to calculate the sumation
 the variable Q(γ,x) [1]
 
 # References
@@ -406,7 +407,7 @@ Physical Review A, 81(4), 043811. (2010).
 """
 
 
-function ionrate_fun!_Keldysh(ionpot::Float64, λ0; Nsum=1e3)
+function ionrate_fun!_Keldysh(ionpot::Float64, λ0; rtol = 1e-6, maxiter = 10000)
     Ip_au = ionpot / au_energy #bangap
     ω0 = 2π*c/λ0
     ω0_au = au_time*ω0 #central frequency
@@ -414,26 +415,27 @@ function ionrate_fun!_Keldysh(ionpot::Float64, λ0; Nsum=1e3)
     #Check units
 
 
-    ionrate! = let ω0_au=ω0_au, m=m, Ip_au=Ip_au, Nsum=Nsum
+    ionrate! = let ω0_au=ω0_au, m=m, Ip_au=Ip_au, rtol = rtol, maxiter = maxiter
         function ir(E) 
-                        
-            @info @sprintf("E is nan? %i",isnan(E))
+            if isnan(E)
+                @info "E is NaN"
+                return zero(E)
+            end           
             
-            if E==0
+            
+            if all(==(0),E)
                 return zero(E)
             end
 
             E_au = abs(E)/au_Efield
 
             # From [1]
+            #Check units for m
             γ = ω0_au/electron/E_au*sqrt(m*Ip_au)
+
 
             Γ=γ^2/(1+γ^2)
             Ξ=1/(1+γ^2)
-
-            if isnan(Γ) | isnan(Ξ)
-                print(E)
-            end
             
             KΓ=ellipk(Γ)
             KΞ=ellipk(Ξ)
@@ -447,7 +449,8 @@ function ionrate_fun!_Keldysh(ionpot::Float64, λ0; Nsum=1e3)
             ν=floor(x+1, digits=0)-x #Check if it makes sense with these units
             
             f(n)=exp(-n*α)*dawson(sqrt(β*(n+2.0*ν)))
-            Q=sqrt(π/2/KΞ)*sum(f,UnitRange(0, Nsum))
+            Q=sqrt(π/2/KΞ)*converge_sum(f, n0 = 0, rtol = 1e-6, maxiter = 10000)[1]
+
 
             ret=2*ω0_au/9/π*(ω0_au*m/ħ/sqrt(Γ))^1.5*Q*exp(-α*floor(x+1, digits=0))
             #same as ν
@@ -477,6 +480,31 @@ function ionrate_Keldysh(IP_or_material, λ0, E::Number; kwargs...)
     out = [zero(E)]
     ionrate_fun!_Keldysh(IP_or_material, λ0; kwargs...)(out, [E])
     return out[1]
+end
+
+"""
+    converge_sum(f, x0; n0 = 0, rtol = 1e-6, maxiter = 10000)
+
+Find limit of sum of a function by brute force. The iteration is stopped when the relative change in
+accumulated value is smaller than `rtol`.
+Not using teh converge_series from Luna.Maths beacuse that runs
+"""
+function converge_sum(f; n0 = 0, rtol = 1e-6, maxiter = 10000)
+    n = n0
+    success = false
+    x0=0
+    x1=0
+    while ~success && n < maxiter
+        x1 += f(n)
+
+        if 2 * abs(x1 - x0) / abs(x1 + x0) < rtol
+            success = true
+        end
+
+        n += 1
+        x0 = x1
+    end
+    return x1, success, n
 end
 
 
