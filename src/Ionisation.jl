@@ -4,7 +4,7 @@ import GSL: hypergeom
 import HDF5
 import FileWatching.Pidfile: mkpidlock
 import Logging: @info
-import Luna.PhysData: c, ħ, electron, m_e, m_u, au_energy, au_time, au_Efield, wlfreq
+import Luna.PhysData: c, ħ, electron, m_e, au_energy, au_time, au_Efield, wlfreq
 import Luna.PhysData: ionisation_potential, quantum_numbers
 import Luna: Maths, Utils
 import Printf: @sprintf
@@ -410,12 +410,11 @@ Physical Review A, 81(4), 043811. (2010).
 function ionrate_fun!_Keldysh(ionpot::Float64, λ0; rtol = 1e-6, maxiter = 10000)
     Ip_au = ionpot / au_energy #bangap
     ω0 = 2π*c/λ0
-    ω0_au = au_time*ω0 #central frequency
-    m=0.635*m_e #usual reduced electron-hole mass from [2]  page 3
-    #Check units
+    ω0_au = ω0*au_time #central frequency
+    m_au=0.635 #usual reduced electron-hole mass is 0.635*m_e [2]  page 3. Which in atomic units is just 0.635
 
 
-    ionrate! = let ω0_au=ω0_au, m=m, Ip_au=Ip_au, rtol = rtol, maxiter = maxiter
+    ionrate! = let ω0_au=ω0_au, m_au=m_au, Ip_au=Ip_au, rtol = rtol, maxiter = maxiter
         function ir(E) 
             if isnan(E)
                 @info "E is NaN"
@@ -430,9 +429,9 @@ function ionrate_fun!_Keldysh(ionpot::Float64, λ0; rtol = 1e-6, maxiter = 10000
             E_au = abs(E)/au_Efield
 
             # From [1]
-            #Check units for m
-            γ = ω0_au/electron/E_au*sqrt(m*Ip_au)
-
+            # γ = ω0_au/electron/E_au*sqrt(m_au*Ip_au)
+            γ = ω0_au/E_au*sqrt(m_au*Ip_au) #in thse units the electron=1
+            # @info @sprintf("ω0_au=%.3e, m_au=%.3e, Ip_au=%.3e, γ=%.3e",ω0_au, m_au, Ip_au, γ)
 
             Γ=γ^2/(1+γ^2)
             Ξ=1/(1+γ^2)
@@ -442,21 +441,28 @@ function ionrate_fun!_Keldysh(ionpot::Float64, λ0; rtol = 1e-6, maxiter = 10000
             EΓ=ellipe(Γ)
             EΞ=ellipe(Ξ)
 
+            @info @sprintf("Γ=%.0e, Ξ=%.0e, KΓ=%.0e, KΞ=%.0e, EΓ=%.0e, EΞ=%.0e",Γ,Ξ,KΓ,KΞ,EΓ,EΞ)
+
+
             α=π*(KΓ-EΓ)/EΞ
             β=π^2/(4*KΞ*EΞ)
 
-            x=2/π*Ip_au/ħ/ω0_au*EΞ/sqrt(Γ)
+            # x=2/π*Ip_au/ħ/ω0_au*EΞ/sqrt(Γ)
+            x=2/π*Ip_au/ω0_au*EΞ/sqrt(Γ) #In these units ħ=1
             ν=floor(x+1, digits=0)-x #Check if it makes sense with these units
             
             f(n)=exp(-n*α)*dawson(sqrt(β*(n+2.0*ν)))
             Q=sqrt(π/2/KΞ)*converge_sum(f, n0 = 0, rtol = 1e-6, maxiter = 10000)[1]
 
 
-            ret=2*ω0_au/9/π*(ω0_au*m/ħ/sqrt(Γ))^1.5*Q*exp(-α*floor(x+1, digits=0))
+            @info @sprintf("α=%.0e, β=%.0e, x=%.0e, ν=%.0e, Q=%.0e", α, β, x, ν, Q)
+
+            # ret=2*ω0_au/9/π*(ω0_au*m_au/ħ/sqrt(Γ))^1.5*Q*exp(-α*floor(x+1, digits=0))
+            ret=2*ω0_au/9/π*(ω0_au*m_au/sqrt(Γ))^1.5*Q*exp(-α*floor(x+1, digits=0)) #In these units ħ=1
             #same as ν
 
             
-            return ret
+            return ret*au_time #Reconvert to SI
         end
         function ionrate!(out, E)
             out .= ir.(E)
@@ -487,7 +493,7 @@ end
 
 Find limit of sum of a function by brute force. The iteration is stopped when the relative change in
 accumulated value is smaller than `rtol`.
-Not using teh converge_series from Luna.Maths beacuse that runs
+Not using the converge_series from Luna.Maths beacuse that runs multiple times the series
 """
 function converge_sum(f; n0 = 0, rtol = 1e-6, maxiter = 10000)
     n = n0
