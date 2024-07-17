@@ -5,25 +5,43 @@ import NumericalIntegration: integrate, SimpsonEven
 import Luna.PhysData: wlfreq
 
 
-gas = :YAG
+# #Testing the elliptical function definition
+# import SpecialFunctions: ellipk as K
+# import SpecialFunctions: ellipe as E
+
+# x=0.1
+# sx=sqrt(1-x^2)
+# K(x)*E(sx)+K(sx)*E(x)-K(x)*K(sx)-pi/2 #Pure from Julia https://specialfunctions.juliamath.org/latest/functions_list/#SpecialFunctions.ellipk-Tuple{Real}
+# K(x^2)*E(sx^2)+K(sx^2)*E(x^2)-K(x^2)*K(sx^2)-pi/2 #Using the k^2 as Keldysh 10.1142/9789811279461_0008
+
+
+
+#Testing the keldysh rate function
+import Luna.PhysData: c, ε_0, ref_index
+I=1e13 #Typical intensity for solids of 1 GW/cm2 = 1e13 W/m2
+material = :Sapphire
 λ0 = 800e-9
-L = 0.15
-grid = Grid.RealGrid(L, λ0, (200e-9, 3000e-9), 0.6e-12)
-E =grid.to.+1
-ionrate = Ionisation.ionrate_fun!_Keldysh(gas, λ0)
+n=real(ref_index(:Sapphire, λ0))
+L = 2e-3
+
+grid = Grid.RealGrid(L, λ0, (799e-9, 801e-9), 0.6e-12)
+E =grid.to .+sqrt(2*I/c/ε_0/n) #E=sqrt(2*I/c/ε_0/n)
+ionrate = Ionisation.ionrate_fun!_Keldysh(material, λ0)
 rate=copy(E)
 ionrate(rate,E)
-rate
 
-# import Luna.Ionisation: converge_sum
-# f(n)=1/(n)^2
-# converge_sum(f,n0 = 1, rtol = 1e-6, maxiter = 10000)
-# import SpecialFunctions: gamma, dawson, ellipk, ellipe
-# ellipk(Inf)
-# import Luna.PhysData:sellmeier_glass
-# material=:YAG
-# sell=sellmeier_glass(material)
-# sell(1.03)
+
+# gas = :Ne
+# λ0 = 800e-9
+# L = 2e-3
+# grid = Grid.RealGrid(L, λ0, (200e-9, 3000e-9), 0.6e-12)
+# E =grid.to .+9e10
+# ionrate = Ionisation.ionrate_fun!_PPTcached(gas, λ0)
+# rate=copy(E)
+# ionrate(rate,E)
+
+
+
 
 
 #%%

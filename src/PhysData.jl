@@ -66,7 +66,7 @@ const gas_str = Dict(
 )
 const glass = (:SiO2, :BK7, :KBr, :CaF2, :BaF2, :Si, :MgF2, :ADPo, :ADPe, :KDPo, :KDPe, :CaCO3, :Sapphire, :YAG, :KGW, :YVO4)
 const uniaxial = (:MgF2, :CaCo3, :Sapphire, :YVO4) #ADP and KDP are split into o and e
-const biaxial = (:KGW)
+const biaxial = tuple(:KGW)
 const metal = (:Ag,:Al)
 
 """
@@ -243,10 +243,10 @@ refractive index directly
 function sellmeier_glass(material::Symbol)
     if material in uniaxial
         @warn "Assuming n ordinary for "*string(material)
-    end
-    if material in biaxial
+    elseif material in biaxial
         @warn "Assuming ny for "*string(material)
     end
+
     if material == :SiO2
         #  J. Opt. Soc. Am. 55, 1205-1208 (1965)
         # TODO: Deal with sqrt of negative values better (somehow...)
@@ -688,7 +688,8 @@ function χ3(material::Symbol, P=1.0, T=roomtemp; source=nothing, λ=nothing)
     if material in glass
         if isnothing(λ)
             λ=1030e-9
-            @warn "Setting wavelength to 1030 nm for calculation of \\chi3 phenomena.\n Give the \\chi3 function the keyword argument \\lambda"
+            #@warn "Setting wavelength to 1030 nm for calculation of \\chi3 phenomena.\n Give the \\chi3 function the keyword argument \\lambda"
+            #no point in givin this warning if there are no other values
         end
         n2 = n2_glass(material, λ=λ)
         n0 = real(ref_index(material, λ))

@@ -404,14 +404,20 @@ Femtosecond filamentation in transparent media.
 [2] Majus, D., Jukna, V., Tamošauskas, G., Valiulis, G., & Dubietis, A. 
 Three-dimensional mapping of multiple filament arrays. 
 Physical Review A, 81(4), 043811. (2010). 
+
+[3] Keldysh, L. v. (2023). Ionization in the field of a strong 
+electromagnetic wave. In Selected Papers of Leonid V Keldysh 
+(Vol. 20, Issue 5, pp. 56–63).
 """
 
 
 function ionrate_fun!_Keldysh(ionpot::Float64, λ0; rtol = 1e-6, maxiter = 10000)
-    Ip_au = ionpot / au_energy #bangap
+    #=After testing the units of te expression seem to be SI and not atomic. 
+    Atomic gives extremelly small rates. Check if it is beacuse of a different factor=#
+    Ip_au = ionpot# / au_energy #bangap
     ω0 = 2π*c/λ0
-    ω0_au = ω0*au_time #central frequency
-    m_au=0.635 #usual reduced electron-hole mass is 0.635*m_e [2]  page 3. Which in atomic units is just 0.635
+    ω0_au = ω0#*au_time #central frequency
+    m_au=0.635*m_e #usual reduced electron-hole mass is 0.635*m_e [2]  page 3. Which in atomic units is just 0.635
 
 
     ionrate! = let ω0_au=ω0_au, m_au=m_au, Ip_au=Ip_au, rtol = rtol, maxiter = maxiter
@@ -426,43 +432,53 @@ function ionrate_fun!_Keldysh(ionpot::Float64, λ0; rtol = 1e-6, maxiter = 10000
                 return zero(E)
             end
 
-            E_au = abs(E)/au_Efield
+            E_au = abs(E)#/au_Efield
 
             # From [1]
-            # γ = ω0_au/electron/E_au*sqrt(m_au*Ip_au)
-            γ = ω0_au/E_au*sqrt(m_au*Ip_au) #in thse units the electron=1
-            # @info @sprintf("ω0_au=%.3e, m_au=%.3e, Ip_au=%.3e, γ=%.3e",ω0_au, m_au, Ip_au, γ)
+            γ = ω0_au/electron/E_au*sqrt(m_au*Ip_au)
+            # γ = ω0_au/E_au*sqrt(m_au*Ip_au) #in thse units the electron=1
+            # @info @sprintf("E_au=%.3e, ω0_au=%.3e, m_au=%.3e, Ip_au=%.3e, γ=%.3e",E_au, ω0_au, m_au, Ip_au, γ)
 
             Γ=γ^2/(1+γ^2)
             Ξ=1/(1+γ^2)
             
-            KΓ=ellipk(Γ)
-            KΞ=ellipk(Ξ)
-            EΓ=ellipe(Γ)
-            EΞ=ellipe(Ξ)
+            #=
+            The square factor in the following is due to the definition of the elliptical intergrals of SpecialFunctions.jl.
+            https://specialfunctions.juliamath.org/latest/functions_list/#SpecialFunctions.ellipk-Tuple{Real}
+            They use the m factor while the original equations by Keldysh [3] use the k^2 definition mentioned in the SpecialFunctions.jl.
+            An easy way to test it is using the Legendre identity mentioned in [3] as a un-numbered expression between Eq. 39 and 40.
+            x=0.1 #xϵ[-Inf,1]
+            sx=sqrt(1-x^2)
+            K(x)*E(sx)+K(sx)*E(x)-K(x)*K(sx)-pi/2 #Pure from Julia. Nonzero.
+            K(x^2)*E(sx^2)+K(sx^2)*E(x^2)-K(x^2)*K(sx^2)-pi/2 #Using the k^2 as Keldysh. Zero proving the identity.
+            =#
+            KΓ=ellipk(Γ^2)
+            KΞ=ellipk(Ξ^2)
+            EΓ=ellipe(Γ^2)
+            EΞ=ellipe(Ξ^2)
 
-            @info @sprintf("Γ=%.0e, Ξ=%.0e, KΓ=%.0e, KΞ=%.0e, EΓ=%.0e, EΞ=%.0e",Γ,Ξ,KΓ,KΞ,EΓ,EΞ)
+            # @info @sprintf("Γ=%.2e, Ξ=%.2e, KΓ=%.2e, KΞ=%.2e, EΓ=%.2e, EΞ=%.2e",Γ,Ξ,KΓ,KΞ,EΓ,EΞ)
 
 
             α=π*(KΓ-EΓ)/EΞ
             β=π^2/(4*KΞ*EΞ)
 
-            # x=2/π*Ip_au/ħ/ω0_au*EΞ/sqrt(Γ)
-            x=2/π*Ip_au/ω0_au*EΞ/sqrt(Γ) #In these units ħ=1
+            x=2/π*Ip_au/ħ/ω0_au*EΞ/sqrt(Γ)
+            # x=2/π*Ip_au/ω0_au*EΞ/sqrt(Γ) #In these units ħ=1
             ν=floor(x+1, digits=0)-x #Check if it makes sense with these units
             
             f(n)=exp(-n*α)*dawson(sqrt(β*(n+2.0*ν)))
             Q=sqrt(π/2/KΞ)*converge_sum(f, n0 = 0, rtol = 1e-6, maxiter = 10000)[1]
 
 
-            @info @sprintf("α=%.0e, β=%.0e, x=%.0e, ν=%.0e, Q=%.0e", α, β, x, ν, Q)
+            # @info @sprintf("α=%.2e, β=%.2e, x=%.2e, ν=%.2e, Q=%.2e", α, β, x, ν, Q)
 
-            # ret=2*ω0_au/9/π*(ω0_au*m_au/ħ/sqrt(Γ))^1.5*Q*exp(-α*floor(x+1, digits=0))
-            ret=2*ω0_au/9/π*(ω0_au*m_au/sqrt(Γ))^1.5*Q*exp(-α*floor(x+1, digits=0)) #In these units ħ=1
+            ret=2*ω0_au/9/π*(ω0_au*m_au/ħ/sqrt(Γ))^1.5*Q*exp(-α*floor(x+1, digits=0))
+            # ret=2*ω0_au/9/π*(ω0_au*m_au/sqrt(Γ))^1.5*Q*exp(-α*floor(x+1, digits=0)) #In these units ħ=1
             #same as ν
 
             
-            return ret*au_time #Reconvert to SI
+            return ret#*au_time #Reconvert to SI
         end
         function ionrate!(out, E)
             out .= ir.(E)
