@@ -423,8 +423,11 @@ function ionrate_fun!_Keldysh(ionpot::Float64, λ0; rtol = 1e-6, maxiter = 10000
     ionrate! = let ω0_au=ω0_au, m_au=m_au, Ip_au=Ip_au, rtol = rtol, maxiter = maxiter
         function ir(E) 
             if isnan(E)
-                @info "E is NaN"
-                return zero(E)
+                error(
+                    "E is NaN"
+                    )
+                # @info "E is NaN"
+                # return zero(E)
             end           
             
             

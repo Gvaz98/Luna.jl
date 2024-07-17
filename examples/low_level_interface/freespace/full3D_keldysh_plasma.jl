@@ -16,19 +16,19 @@ import Luna.PhysData: wlfreq
 
 
 
-#Testing the keldysh rate function
-import Luna.PhysData: c, ε_0, ref_index
-I=1e13 #Typical intensity for solids of 1 GW/cm2 = 1e13 W/m2
-material = :Sapphire
-λ0 = 800e-9
-n=real(ref_index(:Sapphire, λ0))
-L = 2e-3
+# #Testing the keldysh rate function
+# import Luna.PhysData: c, ε_0, ref_index
+# I=1e13 #Typical intensity for solids of 1 GW/cm2 = 1e13 W/m2
+# material = :Sapphire
+# λ0 = 800e-9
+# n=real(ref_index(:Sapphire, λ0))
+# L = 2e-3
 
-grid = Grid.RealGrid(L, λ0, (799e-9, 801e-9), 0.6e-12)
-E =grid.to .+sqrt(2*I/c/ε_0/n) #E=sqrt(2*I/c/ε_0/n)
-ionrate = Ionisation.ionrate_fun!_Keldysh(material, λ0)
-rate=copy(E)
-ionrate(rate,E)
+# grid = Grid.RealGrid(L, λ0, (799e-9, 801e-9), 0.6e-12)
+# E =grid.to .+sqrt(2*I/c/ε_0/n) #E=sqrt(2*I/c/ε_0/n)
+# ionrate = Ionisation.ionrate_fun!_Keldysh(material, λ0)
+# rate=copy(E)
+# ionrate(rate,E)
 
 
 # gas = :Ne
@@ -68,7 +68,7 @@ x = xygrid.x
 y = xygrid.y
 energyfun, energyfunω = Fields.energyfuncs(grid, xygrid)
 
-densityfun = let dens0=PhysData.density(gas, pres)
+densityfun = let dens0=PhysData.density(material, pres)
     z -> dens0
 end
 
@@ -77,7 +77,7 @@ end
 # ionpot = PhysData.ionisation_potential(gas)
 # ionrate = Ionisation.ionrate_fun!_ADK(gas)
 ionpot = PhysData.ionisation_potential(material)
-ionrate = Ionisation.ionrate_fun!_Keldysh(gas, λ0)
+ionrate = Ionisation.ionrate_fun!_Keldysh(material, λ0)
 responses = (Nonlinear.Kerr_field((1 - fr)*PhysData.χ3(material, λ=λ0)),
         Nonlinear.PlasmaCumtrapz(grid.to, grid.to, ionrate, ionpot))
 
