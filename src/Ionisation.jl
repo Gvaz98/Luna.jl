@@ -3,7 +3,7 @@ import SpecialFunctions: gamma, dawson, ellipk, ellipe
 import GSL: hypergeom
 import HDF5
 import FileWatching.Pidfile: mkpidlock
-import Logging: @info
+import Logging: @info, @warn
 import Luna.PhysData: c, ħ, electron, m_e, au_energy, au_time, au_Efield, wlfreq
 import Luna.PhysData: ionisation_potential, quantum_numbers
 import Luna: Maths, Utils
@@ -422,30 +422,22 @@ function ionrate_fun!_Keldysh(ionpot::Float64, λ0; rtol = 1e-6, maxiter = 10000
 
     ionrate! = let ω0_au=ω0_au, m_au=m_au, Ip_au=Ip_au, rtol = rtol, maxiter = maxiter
         function ir(E) 
-            if isnan(E)
-                error(
-                    "E is NaN"
-                    )
-                # @info "E is NaN"
-                # return zero(E)
-            end           
             
-            
-            if all(==(0),E)
-                return zero(E)
-            end
-
             E_au = abs(E)#/au_Efield
 
-            # From [1]
+            # print(E_au)
+
+            # Eq. 91 [1]
             γ = ω0_au/electron/E_au*sqrt(m_au*Ip_au)
             # γ = ω0_au/E_au*sqrt(m_au*Ip_au) #in thse units the electron=1
             # @info @sprintf("E_au=%.3e, ω0_au=%.3e, m_au=%.3e, Ip_au=%.3e, γ=%.3e",E_au, ω0_au, m_au, Ip_au, γ)
 
+            # Eq. 93 [1]
             Γ=γ^2/(1+γ^2)
             Ξ=1/(1+γ^2)
             
             #=
+            Complete elliptical integrals
             The square factor in the following is due to the definition of the elliptical intergrals of SpecialFunctions.jl.
             https://specialfunctions.juliamath.org/latest/functions_list/#SpecialFunctions.ellipk-Tuple{Real}
             They use the m factor while the original equations by Keldysh [3] use the k^2 definition mentioned in the SpecialFunctions.jl.
@@ -456,26 +448,62 @@ function ionrate_fun!_Keldysh(ionpot::Float64, λ0; rtol = 1e-6, maxiter = 10000
             K(x^2)*E(sx^2)+K(sx^2)*E(x^2)-K(x^2)*K(sx^2)-pi/2 #Using the k^2 as Keldysh. Zero proving the identity.
             =#
             KΓ=ellipk(Γ^2)
+            if isinf(KΓ)
+                #=
+                When KΓ→∞, α→∞ meaning that Eq 94 is reduced to its 1st order term (or goes to 0 depending on how you want to handel n=0).
+                Regardless the ionisation rate in Eq. 92 goes to 0.
+                Physically this is the case of low electric fields that do not trigger any ionisation as KΓ→∞ ⇄ E→0.
+                =#
+                return 0                
+            end
             KΞ=ellipk(Ξ^2)
             EΓ=ellipe(Γ^2)
             EΞ=ellipe(Ξ^2)
 
             # @info @sprintf("Γ=%.2e, Ξ=%.2e, KΓ=%.2e, KΞ=%.2e, EΓ=%.2e, EΞ=%.2e",Γ,Ξ,KΓ,KΞ,EΓ,EΞ)
 
-
+            # Eq. 95 [1]
             α=π*(KΓ-EΓ)/EΞ
             β=π^2/(4*KΞ*EΞ)
-
+            
+            # Eq. 96 [1]
             x=2/π*Ip_au/ħ/ω0_au*EΞ/sqrt(Γ)
             # x=2/π*Ip_au/ω0_au*EΞ/sqrt(Γ) #In these units ħ=1
             ν=floor(x+1, digits=0)-x #Check if it makes sense with these units
             
+            # Eq. 94 [1]
             f(n)=exp(-n*α)*dawson(sqrt(β*(n+2.0*ν)))
-            Q=sqrt(π/2/KΞ)*converge_sum(f, n0 = 0, rtol = 1e-6, maxiter = 10000)[1]
+            result=converge_sum(f, n0 = 0, rtol = 1e-6, maxiter = 10000)
+            if result[2]== false 
+                @warn "Failed to converge sum during calculation of term Q with  rtol = $rtol, maxiter = $maxiter."
+            end
+            Q=sqrt(π/2/KΞ)*result[1]
+
+            #=
+            ALTERNATIVE THE HANDELING for K(Γ) MENTIONED ABOVE.
+            USED TO TEST THE VALIDITY OAND IT IS THE SAME
+
+            A simplistic way  to deal with infinity in the K(Γ).
+            From the equations 95 in [1] when K(Γ)->∞ → α->∞.
+            This means than in Eq 94 teh onlys contribution to Q is n=0.
+            Physically it makes sense since K(Γ)->∞ when Γ->1 ↔ γ->∞ ↔ E->0. 
+            =#
+            # if ~isinf(KΓ)
+            #     f(n)=exp(-n*α)*dawson(sqrt(β*(n+2.0*ν)))
+            #     result=converge_sum(f, n0 = 0, rtol = 1e-6, maxiter = 10000)
+            #     if result[2]== false 
+            #         @warn "Failed to converge sum during calculation of term Q with  rtol = $rtol, maxiter = $maxiter."
+            #     end
+            #     Q=sqrt(π/2/KΞ)*result[1]
+            #     # @info @sprintf("ΔQ=%.3e",1-sqrt(π/2/KΞ)*dawson(sqrt(β*(2.0*ν)))/Q)
+            # else
+            #     Q=sqrt(π/2/KΞ)*dawson(sqrt(β*(2.0*ν)))
+            # end
 
 
             # @info @sprintf("α=%.2e, β=%.2e, x=%.2e, ν=%.2e, Q=%.2e", α, β, x, ν, Q)
 
+            # Eq. 92 [1]
             ret=2*ω0_au/9/π*(ω0_au*m_au/ħ/sqrt(Γ))^1.5*Q*exp(-α*floor(x+1, digits=0))
             # ret=2*ω0_au/9/π*(ω0_au*m_au/sqrt(Γ))^1.5*Q*exp(-α*floor(x+1, digits=0)) #In these units ħ=1
             #same as ν
@@ -484,6 +512,9 @@ function ionrate_fun!_Keldysh(ionpot::Float64, λ0; rtol = 1e-6, maxiter = 10000
             return ret#*au_time #Reconvert to SI
         end
         function ionrate!(out, E)
+            # @info out
+            # @info E
+            # @info ir.(E)
             out .= ir.(E)
         end
     end
