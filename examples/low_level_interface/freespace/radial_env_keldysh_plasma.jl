@@ -50,7 +50,7 @@ fr = 0.18
 
 w0 = 40e-6
 energy = 2e-9
-L = 0.6
+L = 2e-3
 
 R = 4e-3
 N = 512
@@ -66,8 +66,18 @@ end
 
 ionpot = PhysData.ionisation_potential(material)
 ionrate = Ionisation.ionrate_fun!_Keldysh(material, λ0)
-responses = (Nonlinear.Kerr_field((1 - fr)*PhysData.χ3(material, λ=λ0)),
+# responses = (Nonlinear.Kerr_field((1 - fr)*PhysData.χ3(material, λ=λ0)),
+#         Nonlinear.PlasmaCumtrapz(grid.to, grid.to, ionrate, ionpot))
+responses = (Nonlinear.Kerr_env(PhysData.γ3_gas(gas)),
         Nonlinear.PlasmaCumtrapz(grid.to, grid.to, ionrate, ionpot))
+
+# ionpot = PhysData.ionisation_potential(gas)
+# # ionrate = Ionisation.ionrate_fun!_PPTcached(gas, λ0)
+# ionrate = Ionisation.ionrate_fun!_ADK(gas)
+# responses = (Nonlinear.Kerr_field((1 - fr)*PhysData.χ3(material, λ=λ0)),
+#         Nonlinear.PlasmaCumtrapz(grid.to, grid.to, ionrate, ionpot))
+# # responses = (Nonlinear.Kerr_env(PhysData.γ3_gas(gas)),
+# #         Nonlinear.PlasmaCumtrapz(grid.to, grid.to, ionrate, ionpot))       
 
 linop = LinearOps.make_const_linop(grid, q, PhysData.ref_index_fun(gas, pres))
 

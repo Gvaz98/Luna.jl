@@ -424,6 +424,9 @@ function ionrate_fun!_Keldysh(ionpot::Float64, λ0; rtol = 1e-6, maxiter = 10000
         function ir(E) 
             
             E_au = abs(E)#/au_Efield
+            if E_au==0
+                return 0
+            end
 
             # print(E_au)
 
@@ -454,7 +457,7 @@ function ionrate_fun!_Keldysh(ionpot::Float64, λ0; rtol = 1e-6, maxiter = 10000
                 Regardless the ionisation rate in Eq. 92 goes to 0.
                 Physically this is the case of low electric fields that do not trigger any ionisation as KΓ→∞ ⇄ E→0.
                 =#
-                return 0                
+                return 0.0                
             end
             KΞ=ellipk(Ξ^2)
             EΓ=ellipe(Γ^2)
@@ -475,7 +478,7 @@ function ionrate_fun!_Keldysh(ionpot::Float64, λ0; rtol = 1e-6, maxiter = 10000
             f(n)=exp(-n*α)*dawson(sqrt(β*(n+2.0*ν)))
             result=converge_sum(f, n0 = 0, rtol = 1e-6, maxiter = 10000)
             if result[2]== false 
-                @warn "Failed to converge sum during calculation of term Q with  rtol = $rtol, maxiter = $maxiter."
+                @warn "Failed to converge sum during calculation of term Q with  rtol = $rtol, maxiter = $maxiter." maxlog=1
             end
             Q=sqrt(π/2/KΞ)*result[1]
 
