@@ -427,6 +427,9 @@ function ionrate_fun!_Keldysh(ionpot::Float64, λ0; rtol = 1e-6, maxiter = 10000
             if E_au==0
                 return 0
             end
+            if isnan(E_au)
+                ArgumentError("The electric field is NaN")
+            end
 
             # print(E_au)
 
@@ -484,11 +487,11 @@ function ionrate_fun!_Keldysh(ionpot::Float64, λ0; rtol = 1e-6, maxiter = 10000
 
             #=
             ALTERNATIVE THE HANDELING for K(Γ) MENTIONED ABOVE.
-            USED TO TEST THE VALIDITY OAND IT IS THE SAME
+            USED TO TEST THE VALIDITY AND IT IS THE SAME
 
             A simplistic way  to deal with infinity in the K(Γ).
             From the equations 95 in [1] when K(Γ)->∞ → α->∞.
-            This means than in Eq 94 teh onlys contribution to Q is n=0.
+            This means than in Eq 94 the only contribution to Q is n=0.
             Physically it makes sense since K(Γ)->∞ when Γ->1 ↔ γ->∞ ↔ E->0. 
             =#
             # if ~isinf(KΓ)

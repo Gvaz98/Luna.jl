@@ -60,7 +60,7 @@ q = Hankel.QDHT(R, N, dim=2)
 
 energyfun, energyfun_ω = Fields.energyfuncs(grid, q)
 
-densityfun = let dens0=PhysData.density(gas, pres)
+densityfun = let dens0=PhysData.density(material, pres)
     z -> dens0
 end
 
@@ -68,20 +68,19 @@ ionpot = PhysData.ionisation_potential(material)
 ionrate = Ionisation.ionrate_fun!_Keldysh(material, λ0)
 # responses = (Nonlinear.Kerr_field((1 - fr)*PhysData.χ3(material, λ=λ0)),
 #         Nonlinear.PlasmaCumtrapz(grid.to, grid.to, ionrate, ionpot))
-responses = (Nonlinear.Kerr_env(PhysData.γ3_gas(gas)),
-        Nonlinear.PlasmaCumtrapz(grid.to, grid.to, ionrate, ionpot))
+responses = (Nonlinear.PlasmaCumtrapz(grid.to, grid.to, ionrate, ionpot),)
 
 # ionpot = PhysData.ionisation_potential(gas)
-# # ionrate = Ionisation.ionrate_fun!_PPTcached(gas, λ0)
-# ionrate = Ionisation.ionrate_fun!_ADK(gas)
-# responses = (Nonlinear.Kerr_field((1 - fr)*PhysData.χ3(material, λ=λ0)),
-#         Nonlinear.PlasmaCumtrapz(grid.to, grid.to, ionrate, ionpot))
-# # responses = (Nonlinear.Kerr_env(PhysData.γ3_gas(gas)),
-# #         Nonlinear.PlasmaCumtrapz(grid.to, grid.to, ionrate, ionpot))       
+# ionrate = Ionisation.ionrate_fun!_PPTcached(gas, λ0)
+# # ionrate = Ionisation.ionrate_fun!_ADK(gas)
+# # responses = (Nonlinear.Kerr_field((1 - fr)*PhysData.χ3(material, λ=λ0)),
+# #         Nonlinear.PlasmaCumtrapz(grid.to, grid.to, ionrate, ionpot))
+# responses = (Nonlinear.Kerr_env(PhysData.γ3_gas(gas)),
+#         Nonlinear.PlasmaCumtrapz(grid.to, grid.to, ionrate, ionpot))       
 
-linop = LinearOps.make_const_linop(grid, q, PhysData.ref_index_fun(gas, pres))
+linop = LinearOps.make_const_linop(grid, q, PhysData.ref_index_fun(material, pres))
 
-normfun = NonlinearRHS.const_norm_radial(grid, q, PhysData.ref_index_fun(gas, pres))
+normfun = NonlinearRHS.const_norm_radial(grid, q, PhysData.ref_index_fun(material, pres))
 
 inputs = Fields.GaussGaussField(λ0=λ0, τfwhm=τ, energy=energy, w0=w0, propz=-0.3)
 
