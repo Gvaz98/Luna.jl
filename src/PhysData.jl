@@ -242,9 +242,9 @@ refractive index directly
 """
 function sellmeier_glass(material::Symbol)
     if material in uniaxial
-        @warn "Assuming n ordinary for "*string(material) maxtol=1
+        @warn "Assuming n ordinary for "*string(material) maxlog=1
     elseif material in biaxial
-        @warn "Assuming ny for "*string(material) maxtol=1
+        @warn "Assuming ny for "*string(material) maxlog=1
     end
 
     if material == :SiO2
@@ -688,7 +688,7 @@ function χ3(material::Symbol, P=1.0, T=roomtemp; source=nothing, λ=nothing)
     if material in glass
         if isnothing(λ)
             λ=1030e-9
-            #@warn "Setting wavelength to 1030 nm for calculation of \\chi3 phenomena.\n Give the \\chi3 function the keyword argument \\lambda" maxtol=1
+            #@warn "Setting wavelength to 1030 nm for calculation of \\chi3 phenomena.\n Give the \\chi3 function the keyword argument \\lambda" maxlog=1
             #no point in givin this warning if there are no other values
         end
         n2 = n2_glass(material, λ=λ)
@@ -1038,7 +1038,7 @@ function raman_parameters(material)
              )
     elseif material in glass # [18]
         if material != :SiO2
-            @warn "Assuming Ramman parameters of SiO2. It is the standard approximation." maxtol=1
+            @warn "Assuming Ramman parameters of SiO2. It is the standard approximation." maxlog=1
         end
         rp = (kind = :intermediate,
               K = 1.0,
