@@ -49,7 +49,7 @@ fr = 0.18
 λ0 = 800e-9
 
 w0 = 40e-6
-energy = 2e-9
+energy = 2e-3
 L = 2e-3
 
 R = 4e-3
@@ -66,14 +66,14 @@ end
 
 ionpot = PhysData.ionisation_potential(material)
 ionrate = Ionisation.ionrate_fun!_Keldysh(material, λ0)
-# responses = (Nonlinear.Kerr_field((1 - fr)*PhysData.χ3(material, λ=λ0)),
-#         Nonlinear.PlasmaCumtrapz(grid.to, grid.to, ionrate, ionpot))
-responses = (Nonlinear.PlasmaCumtrapz(grid.to, grid.to, ionrate, ionpot),)
+responses = (Nonlinear.Kerr_env((1 - fr)*PhysData.χ3(material, λ=λ0)),
+            Nonlinear.PlasmaCumtrapz(grid.to, convert(Array{ComplexF64}, grid.to), ionrate, ionpot))
+# responses = (Nonlinear.PlasmaCumtrapz(grid.to, grid.to, ionrate, ionpot),)
 
 # ionpot = PhysData.ionisation_potential(gas)
 # ionrate = Ionisation.ionrate_fun!_PPTcached(gas, λ0)
 # # ionrate = Ionisation.ionrate_fun!_ADK(gas)
-# # responses = (Nonlinear.Kerr_field((1 - fr)*PhysData.χ3(material, λ=λ0)),
+# # responses = (Nonlinear.Kerr_env((1 - fr)*PhysData.χ3(material, λ=λ0)),
 # #         Nonlinear.PlasmaCumtrapz(grid.to, grid.to, ionrate, ionpot))
 # responses = (Nonlinear.Kerr_env(PhysData.γ3_gas(gas)),
 #         Nonlinear.PlasmaCumtrapz(grid.to, grid.to, ionrate, ionpot))       
@@ -186,3 +186,5 @@ for ii in 1:3
     plt.xlim(-42, 42)
     plt.ylim(-1.8, 1.8)
 end
+
+plt.show()
