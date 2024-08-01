@@ -39,7 +39,7 @@ import NumericalIntegration: integrate, SimpsonEven
 # rate=copy(E)
 # ionrate(rate,E)
 
-gas = :Ar
+
 pres = 1.2
 
 material= :YAG
@@ -52,8 +52,8 @@ w0 = 40e-6
 energy = 2e-3
 L = 2e-3
 
-R = 4e-3
-N = 512
+R = 6e-3
+N = 128
 
 grid = Grid.EnvGrid(L, 800e-9, (400e-9, 2000e-9), 0.2e-12)
 q = Hankel.QDHT(R, N, dim=2)
@@ -186,5 +186,29 @@ for ii in 1:3
     plt.xlim(-42, 42)
     plt.ylim(-1.8, 1.8)
 end
+
+
+
+
+
+# Luna.Plotting.prop_2D(output, specaxis=:λ)
+
+λ = Luna.PhysData.wlfreq.(ω)
+plt.figure()
+plt.pcolormesh(zout*1e2, λ*1e9, Iω0log)
+plt.colorbar()
+plt.clim(0, -6)
+plt.ylim(500,2100)
+plt.xlabel("z (m)")
+plt.ylabel("Wavelength (nm)")
+plt.title("I(r=0, ω)")
+
+plt.figure()
+plt.plot(λ*1e9, Iω0log[:,end])
+plt.xlim(500,2100)
+plt.xlabel("Wavelength (nm)")
+plt.ylabel("I(r=0, ω) a.u.")
+
+
 
 plt.show()

@@ -479,7 +479,7 @@ function ionrate_fun!_Keldysh(ionpot::Float64, λ0; rtol = 1e-6, maxiter = 10000
             
             # Eq. 94 [1]
             f(n)=exp(-n*α)*dawson(sqrt(β*(n+2.0*ν)))
-            result=converge_sum(f, n0 = 0, rtol = 1e-6, maxiter = 10000)
+            result=Maths.converge_sum(f, n0 = 0, rtol = 1e-6, maxiter = 10000)
             if result[2]== false 
                 @warn "Failed to converge sum during calculation of term Q with  rtol = $rtol, maxiter = $maxiter." maxlog=1
             end
@@ -496,7 +496,7 @@ function ionrate_fun!_Keldysh(ionpot::Float64, λ0; rtol = 1e-6, maxiter = 10000
             =#
             # if ~isinf(KΓ)
             #     f(n)=exp(-n*α)*dawson(sqrt(β*(n+2.0*ν)))
-            #     result=converge_sum(f, n0 = 0, rtol = 1e-6, maxiter = 10000)
+            #     result=Maths.converge_sum(f, n0 = 0, rtol = 1e-6, maxiter = 10000)
             #     if result[2]== false 
             #         @warn "Failed to converge sum during calculation of term Q with  rtol = $rtol, maxiter = $maxiter."
             #     end
@@ -544,30 +544,6 @@ function ionrate_Keldysh(IP_or_material, λ0, E::Number; kwargs...)
     return out[1]
 end
 
-"""
-    converge_sum(f, x0; n0 = 0, rtol = 1e-6, maxiter = 10000)
-
-Find limit of sum of a function by brute force. The iteration is stopped when the relative change in
-accumulated value is smaller than `rtol`.
-Not using the converge_series from Luna.Maths beacuse that runs multiple times the series
-"""
-function converge_sum(f; n0 = 0, rtol = 1e-6, maxiter = 10000)
-    n = n0
-    success = false
-    x0=0
-    x1=0
-    while ~success && n < maxiter
-        x1 += f(n)
-
-        if 2 * abs(x1 - x0) / abs(x1 + x0) < rtol
-            success = true
-        end
-
-        n += 1
-        x0 = x1
-    end
-    return x1, success, n
-end
 
 
 end

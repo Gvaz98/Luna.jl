@@ -736,6 +736,40 @@ function converge_series(f, x0; n0 = 0, rtol = 1e-6, maxiter = 10000)
 end
 
 """
+converge_sum(f; n0 = 0, rtol = 1e-6, maxiter = 10000)
+
+Compute the sum of a function `f` until convergence.
+
+# Arguments
+- `f`: The function to be summed.
+- `n0`: The starting value for the sum (default: 0).
+- `rtol`: The relative tolerance for convergence (default: 1e-6).
+- `maxiter`: The maximum number of iterations (default: 10000).
+
+# Returns
+- `x1`: The final sum.
+- `success`: A boolean indicating whether the sum converged.
+- `n`: The number of iterations performed.
+"""
+function converge_sum(f; n0 = 0, rtol = 1e-6, maxiter = 10000)
+    n = n0
+    success = false
+    x0=0
+    x1=0
+    while ~success && n < maxiter
+        x1 += f(n)
+
+        if 2 * abs(x1 - x0) / abs(x1 + x0) < rtol
+            success = true
+        end
+
+        n += 1
+        x0 = x1
+    end
+    return x1, success, n
+end
+
+"""
     check_spline_args(x, y)
 
 Ensure that the x array contains unique and sorted values (while preserving the
