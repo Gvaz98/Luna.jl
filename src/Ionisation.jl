@@ -4,7 +4,7 @@ import GSL: hypergeom
 import HDF5
 import FileWatching.Pidfile: mkpidlock
 import Logging: @info, @warn
-import Luna.PhysData: c, ħ, electron, m_e, au_energy, au_time, au_Efield, wlfreq
+import Luna.PhysData: c, ħ, μ_0, electron, m_e, au_energy, au_time, au_Efield, wlfreq
 import Luna.PhysData: ionisation_potential, quantum_numbers
 import Luna: Maths, Utils
 import Printf: @sprintf
@@ -108,7 +108,7 @@ end
 
 function ionrate_fun!_PPTaccel(ionpot::Float64, λ0, Z, l; kwargs...)
     E, rate = makePPTcache(ionpot, λ0, Z, l; kwargs...)
-    return makePPTaccel(E, rate)
+    return makeAccel(E, rate)
 end
 
 """
@@ -162,7 +162,7 @@ function ionrate_fun!_PPTcached(ionpot::Float64, λ0, Z, l;
                 end
             end
         end
-        return makePPTaccel(E, rate)
+        return makeAccel(E, rate)
     end
 end
 
@@ -171,7 +171,7 @@ function loadPPTaccel(fpath)
     E, rate = HDF5.h5open(fpath, "r") do file
         (read(file["E"]), read(file["rate"]))
     end
-    makePPTaccel(E, rate)
+    makeAccel(E, rate)
 end
 
 function makePPTcache(ionpot::Float64, λ0, Z, l;
@@ -185,7 +185,7 @@ function makePPTcache(ionpot::Float64, λ0, Z, l;
     E = collect(range(Emin, stop=Emax, length=N));
     @info @sprintf("Pre-calculating PPT rate rate for %.2f eV, %.1f nm...", ionpot/electron, 1e9λ0)
     rate = ionrate_PPT(ionpot, λ0, Z, l, E; sum_tol=sum_tol, cycle_average);
-    @info "...PPT pre-calcuation done"
+    @info "...PPT pre-calculation done"
     return E, rate
 end
 
@@ -234,7 +234,7 @@ function ionfrac!(frac, rate, E, δt)
     @. frac = 1 - exp(-frac)
 end
 
-function makePPTaccel(E, rate)
+function makeAccel(E, rate)
     # Interpolating the log and re-exponentiating makes the spline more accurate
     cspl = Maths.CSpline(E, log.(rate); bounds_error=true)
     Emin = minimum(E)
@@ -246,7 +246,7 @@ function makePPTaccel(E, rate)
                 out[ii] = 0.0
             elseif aE > Emax
                 error(
-                    "Field strength $aE V/m exceeds maximum for PPT ionisation rate ($Emax V/m)."
+                    "Field strength $aE V/m exceeds maximum for ionisation rate ($Emax V/m)."
                     )
             else
                 out[ii] = exp(cspl(aE))
@@ -384,6 +384,105 @@ end
 
 
 
+
+
+#--------------------------------------------------------------------------------------~
+"""
+    ionrate_fun!_Keldyshaccel(material::Symbol, λ0; kwargs...)
+    ionrate_fun!_Keldyshaccel(ionpot::Float64, λ0, Z, l; kwargs...)
+
+Create an accelerated (interpolated) Keldysh ionisation rate function.
+"""
+function ionrate_fun!_keldysaccel(material::Symbol, λ0; kwargs...)
+    ip = ionisation_potential(material)
+    ionrate_fun!_Keldyshaccel(ip, λ0; kwargs...)
+end
+
+function ionrate_fun!_Keldyshaccel(ionpot::Float64, λ0; kwargs...)
+    E, rate = makeKeldyshcache(ionpot, λ0; kwargs...)
+    return makeAccel(E, rate)
+end
+
+"""
+    ionrate_fun!_Keldyshcached(material::Symbol, λ0; kwargs...)
+    ionrate_fun!_Keldyshcached(ionpot::Float64, λ0, Z, l; kwargs...)
+
+Create a cached (saved) interpolated Keldysh ionisation rate function. If a saved lookup table
+exists, load this rather than recalculate.
+
+# Keyword arguments
+- `N::Int`: Number of samples with which to create the `CSpline` interpolant.
+- `Emax::Number`: Maximum field strength to include in the interpolant.
+- `cachedir::String`: Path to the directory where the cache should be stored and loaded from.
+    Defaults to \$HOME/.luna/keldyshcache
+
+Other keyword arguments are passed on to [`ionrate_fun_Keldysh`](@ref)
+"""
+function ionrate_fun!_Keldyshcached(material::Symbol, λ0; kwargs...)
+    ip = ionisation_potential(material)
+    ionrate_fun!_Keldyshcached(ip, λ0; kwargs...)
+end
+
+function ionrate_fun!_Keldyshcached(ionpot::Float64, λ0;
+                                 rtol = 1e-6, maxiter = 10000, N=2^16, Emax=nothing,
+                                cachedir=joinpath(Utils.cachedir(), "keldyshcache"),
+                                stale_age=60*10)
+    h = hash((ionpot, λ0, rtol, maxiter, N, Emax))
+    fname = string(h, base=16)*".h5"
+    fpath = joinpath(cachedir, fname)
+    print(fpath, "\n")
+    lockpath = joinpath(cachedir, "keldyshlock")
+    isdir(cachedir) || mkpath(cachedir)
+    if isfile(fpath)
+        @info @sprintf("Found cached Keldysh rate for %.2f eV, %.1f nm", ionpot/electron, 1e9λ0)
+        rate = mkpidlock(lockpath; stale_age) do
+            loadKeldyshaccel(fpath)
+        end
+        return rate
+    else
+        E, rate = makeKeldyshcache(ionpot::Float64, λ0;
+                                rtol = rtol, maxiter = maxiter, N=N, Emax=Emax)
+        mkpidlock(lockpath; stale_age) do
+            if ~isfile(fpath) # makeKeldyshcache takes a while - has another process saved first?
+                @info @sprintf(
+                    "Saving Keldysh rate for %.2f eV, %.1f nm in %s",
+                    ionpot/electron, 1e9λ0, cachedir
+                )
+                HDF5.h5open(fpath, "cw") do file
+                    file["E"] = E
+                    file["rate"] = rate
+                end
+            end
+        end
+        return makeAccel(E, rate)
+    end
+end
+
+function loadKeldyshaccel(fpath)
+    isfile(fpath) || error("Keldysh cache file $fpath not found!")
+    E, rate = HDF5.h5open(fpath, "r") do file
+        (read(file["E"]), read(file["rate"]))
+    end
+    makeAccel(E, rate)
+end
+
+function makeKeldyshcache(ionpot::Float64, λ0;
+                        rtol = 1e-6, maxiter = 10000, N=2^16, Emax=nothing)
+    Imax=ionpot/λ0^2 #Intensity in W/cm^2 where the energy matches the ionisation potential and area is the mininum of λ^2
+    @info @sprintf("Imax=%.2e", Imax)
+    # Emax = isnothing(Emax) ? 1000*sqrt(μ_0*c*Imax) : Emax
+    Emax = isnothing(Emax) ? 1e10 : Emax
+    @info @sprintf("Emax=%.2e", Emax)
+    # ω0 = 2π*c/λ0
+    # Emin = ω0*sqrt(2m_e*ionpot)/electron/0.5 # Keldysh parameter of 0.5
+    Emin = Emax/5000
+
+    E = collect(range(Emin, stop=Emax, length=N));
+    @info @sprintf("Pre-calculating Keldysh rate rate for %.2f eV, %.1f nm...", ionpot/electron, 1e9λ0)
+    rate = ionrate_Keldysh(ionpot, λ0, E; rtol = rtol, maxiter = maxiter);
+    @info "...Keldysh pre-calculation done"
+    return E, rate
+end
 
 
 """
