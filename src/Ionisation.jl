@@ -430,7 +430,6 @@ function ionrate_fun!_Keldyshcached(ionpot::Float64, λ0;
     h = hash((ionpot, λ0, rtol, maxiter, N, Emax))
     fname = string(h, base=16)*".h5"
     fpath = joinpath(cachedir, fname)
-    print(fpath, "\n")
     lockpath = joinpath(cachedir, "keldyshlock")
     isdir(cachedir) || mkpath(cachedir)
     if isfile(fpath)
@@ -468,14 +467,10 @@ end
 
 function makeKeldyshcache(ionpot::Float64, λ0;
                         rtol = 1e-6, maxiter = 10000, N=2^16, Emax=nothing)
-    Imax=ionpot/λ0^2 #Intensity in W/cm^2 where the energy matches the ionisation potential and area is the mininum of λ^2
-    @info @sprintf("Imax=%.2e", Imax)
-    # Emax = isnothing(Emax) ? 1000*sqrt(μ_0*c*Imax) : Emax
-    Emax = isnothing(Emax) ? 1e10 : Emax
-    @info @sprintf("Emax=%.2e", Emax)
-    # ω0 = 2π*c/λ0
-    # Emin = ω0*sqrt(2m_e*ionpot)/electron/0.5 # Keldysh parameter of 0.5
-    Emin = Emax/5000
+    Imax=ionpot/λ0^3*c #Intensity in W/cm^2 where the energy matches the ionisation potential, the duration λ/c and area of λ^2.
+    #i.e. a λ^3 laser
+    Emax = isnothing(Emax) ? 1e4*sqrt(μ_0*c*Imax) : Emax
+    Emin = Emax/50000
 
     E = collect(range(Emin, stop=Emax, length=N));
     @info @sprintf("Pre-calculating Keldysh rate rate for %.2f eV, %.1f nm...", ionpot/electron, 1e9λ0)
